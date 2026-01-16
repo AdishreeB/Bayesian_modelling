@@ -1,0 +1,51 @@
+import pandas as pd
+import numpy as np
+import pymc as pm
+import arviz as az
+
+# Generate dummy data
+np.random.seed(1)
+data = {
+    'Std_No': range(1, 101),
+    'HoursStudied': np.random.normal(8, 2, 100), # Mean 8 hrs, SD 2
+    'MidtermGrade': np.random.normal(70, 10, 100), # Mean 70, SD 10
+    'FinalScore': 0 # Placeholder for target
+}
+df = pd.DataFrame(data)
+# Create a relationship: FinalScore = 20 + 0.8*HoursStudied + 0.5*MidtermGrade + noise
+df['FinalScore'] = 20 + 0.8 * df['HoursStudied'] + 0.5 * df['MidtermGrade'] + np.random.normal(0, 5, 100)
+df['FinalScore'] = np.clip(df['FinalScore'], 0, 100) # Keep scores in range
+print(df.head(10))
+
+
+# Define the Bayesian Model
+with pm.Model() as marks_model:
+    # Priors for model parameters
+    intercept = pm.Normal('intercept', mu=50, sigma=20) # Intercept (prior belief about average score)
+    study_hours = pm.Normal('study_hours', mu=1, sigma=1) # Slope for Hours studied
+    midterm_marks = pm.Normal('midterm_marks', mu=0.5, sigma=0.5) # Slope for Midterm grade
+    sigma = pm.HalfNormal('sigma', sigma=10) # buffer (standard deviation)
+
+    # Expected value of final score
+    mu = intercept + study_hours * df['HoursStudied'] + midterm_marks * df['MidtermGrade']
+
+    # Likelihood
+    likelihood = pm.Normal('likelihood', mu=mu, sigma=sigma, observed=df['FinalScore'])
+
+    # Sample from the posterior
+    trace = pm.sample(2000, tune=1000, cores=1)
+    az.plot_trace(trace) # Visualize posterior distributions
+
+    # Create posterior predictive samples
+    posterior_predictive = pm.sample_posterior_predictive(trace, model=marks_model)
+
+# Get mean prediction and credible interval of 95% (let's say)
+predicted_score = np.mean(posterior_predictive.posterior_predictive['likelihood'])
+ci_lower = np.percentile(posterior_predictive.posterior_predictive['likelihood'], 2.5)
+ci_upper = np.percentile(posterior_predictive.posterior_predictive['likelihood'], 97.5)
+
+print(f"\nPredicted Final Score: {predicted_score:.2f}")
+print(f"95% Credible Interval: [{ci_lower:.2f}, {ci_upper:.2f}]")
+
+# Or check posterior for specific parameters
+az.summary(trace, var_names=['intercept', 'study_hours', 'midterm_marks', 'sigma'])
