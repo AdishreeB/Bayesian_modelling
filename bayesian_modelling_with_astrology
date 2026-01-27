@@ -15,99 +15,53 @@ theta_ind_true = theta_zodiac_true[zodiac_idx] + rng.normal(0, 0.6, size=(N, N_T
 
 EI_self = theta_ind_true[:, 0] + rng.normal(0, 1, N)
 EI_regulation = theta_ind_true[:, 0] + rng.normal(0, 1, N)
-
 anger_outbursts = rng.poisson(lam=np.exp(theta_ind_true[:, 1]))
 anger_intensity = theta_ind_true[:, 1] + rng.normal(0, 1, N)
-
 vuln_openness = theta_ind_true[:, 2] + rng.normal(0, 1, N)
 vuln_disclosure = theta_ind_true[:, 2] + rng.normal(0, 1, N)
-
 logic_score = theta_ind_true[:, 3] + rng.normal(0, 1, N)
 bias_resistance = theta_ind_true[:, 3] + rng.normal(0, 1, N)
-
 risk_score = theta_ind_true[:, 4] + rng.normal(0, 1, N)
 delay_discounting = theta_ind_true[:, 4] + rng.normal(0, 1, N)
-
 empathy_affective = theta_ind_true[:, 5] + rng.normal(0, 1, N)
 empathy_cognitive = theta_ind_true[:, 5] + rng.normal(0, 1, N)
-
 grit_score = theta_ind_true[:, 6] + rng.normal(0, 1, N)
 persistence_score = theta_ind_true[:, 6] + rng.normal(0, 1, N)
-
 closeness_comfort = theta_ind_true[:, 7] + rng.normal(0, 1, N)
 abandonment_fear = -theta_ind_true[:, 7] + rng.normal(0, 1, N)
 
-
 with pm.Model() as model:
-
-    chol, _, _ = pm.LKJCholeskyCov(
-        "trait_cov",
-        n=N_TRAITS,
-        eta=3,
-        sd_dist=pm.HalfNormal.dist(0.5)
-    )
-
-    theta_zodiac = pm.MvNormal(
-        "theta_zodiac",
-        mu=np.zeros(N_TRAITS),
-        chol=chol,
-        shape=(N_ZODIAC, N_TRAITS)
-    )
-
+    chol, _, _ = pm.LKJCholeskyCov("trait_cov", n=N_TRAITS, eta=3, sd_dist=pm.HalfNormal.dist(0.5))
+    theta_zodiac = pm.MvNormal("theta_zodiac", mu=np.zeros(N_TRAITS), chol=chol, shape=(N_ZODIAC, N_TRAITS))
     sigma_person = pm.HalfNormal("sigma_person", 0.6)
-
-    theta_ind = pm.Normal(
-        "theta_ind",
-        mu=theta_zodiac[zodiac_idx],
-        sigma=sigma_person,
-        shape=(N, N_TRAITS)
-    )
+    theta_ind = pm.Normal("theta_ind", mu=theta_zodiac[zodiac_idx], sigma=sigma_person, shape=(N, N_TRAITS))
 
     pm.Normal("EI_self", mu=theta_ind[:, 0], sigma=1, observed=EI_self)
     pm.Normal("EI_regulation", mu=theta_ind[:, 0], sigma=1, observed=EI_regulation)
-
     pm.Poisson("anger_outbursts", mu=pm.math.exp(theta_ind[:, 1]), observed=anger_outbursts)
     pm.Normal("anger_intensity", mu=theta_ind[:, 1], sigma=1, observed=anger_intensity)
-
     pm.Normal("vuln_openness", mu=theta_ind[:, 2], sigma=1, observed=vuln_openness)
     pm.Normal("vuln_disclosure", mu=theta_ind[:, 2], sigma=1, observed=vuln_disclosure)
-
     pm.Normal("logic_score", mu=theta_ind[:, 3], sigma=1, observed=logic_score)
     pm.Normal("bias_resistance", mu=theta_ind[:, 3], sigma=1, observed=bias_resistance)
-
     pm.Normal("risk_score", mu=theta_ind[:, 4], sigma=1, observed=risk_score)
     pm.Normal("delay_discounting", mu=theta_ind[:, 4], sigma=1, observed=delay_discounting)
-
     pm.Normal("empathy_affective", mu=theta_ind[:, 5], sigma=1, observed=empathy_affective)
     pm.Normal("empathy_cognitive", mu=theta_ind[:, 5], sigma=1, observed=empathy_cognitive)
-
     pm.Normal("grit_score", mu=theta_ind[:, 6], sigma=1, observed=grit_score)
     pm.Normal("persistence_score", mu=theta_ind[:, 6], sigma=1, observed=persistence_score)
-
     pm.Normal("closeness_comfort", mu=theta_ind[:, 7], sigma=1, observed=closeness_comfort)
     pm.Normal("abandonment_fear", mu=-theta_ind[:, 7], sigma=1, observed=abandonment_fear)
 
-    trace = pm.sample(
-        draws=1000,
-        tune=1000,
-        chains=4,
-        target_accept=0.9,
-        init="adapt_diag",
-        random_seed=69,
-        return_inferencedata=False
-    )
+    trace = pm.sample(draws=1000, tune=1000, chains=4, target_accept=0.9, init="adapt_diag", random_seed=69, return_inferencedata=False)
 
 with model:
-    ppc = pm.sample_posterior_predictive(
-        trace,
-        random_seed=69,
-        return_inferencedata=False,
-    )
-
+    ppc = pm.sample_posterior_predictive(trace, random_seed=69, return_inferencedata=False)
 
 def ppc_plot(obs, sim, title):
-    plt.hist(obs, bins=30, alpha=0.6, label="Observed")
-    plt.hist(sim.mean(axis=0), bins=30, alpha=0.6, label="Simulated")
+    plt.figure(figsize=(8, 5))
+    plt.hist(obs, bins=30, alpha=0.7, label="Observed", color='steelblue')
+    plt.hist(sim.mean(axis=(0, 1)), bins=30, alpha=0.7, label="Simulated", color='coral') # Fixed line
     plt.legend()
     plt.title(title)
     plt.show()
@@ -120,4 +74,3 @@ ppc_plot(risk_score, ppc["risk_score"], "PPC: impulsivity")
 ppc_plot(empathy_affective, ppc["empathy_affective"], "PPC: empathy")
 ppc_plot(grit_score, ppc["grit_score"], "PPC: determination")
 ppc_plot(closeness_comfort, ppc["closeness_comfort"], "PPC: attachment security")
-'''
